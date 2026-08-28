@@ -3,6 +3,7 @@ import re
 
 
 def extract_url_features(url):
+
     # Make sure URL has a scheme
     if not url.startswith(("http://", "https://")):
         url = "http://" + url
@@ -15,28 +16,64 @@ def extract_url_features(url):
 
     features = {}
 
-    # Basic URL features
+    # --------------------------------------------------
+    # BASIC URL FEATURES
+    # --------------------------------------------------
+
     features["URLLength"] = len(url)
+
     features["DomainLength"] = len(domain)
 
-    # Check if domain is an IP address
+    # --------------------------------------------------
+    # IP ADDRESS
+    # --------------------------------------------------
+
+    # Remove port if present
+    domain_without_port = domain.split(":")[0]
+
     features["IsDomainIP"] = int(
-        bool(re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", domain))
+        bool(
+            re.fullmatch(
+                r"\d{1,3}(\.\d{1,3}){3}",
+                domain_without_port
+            )
+        )
     )
 
-    # Number of subdomains
-    domain_parts = domain.split(".")
-    features["NoOfSubDomain"] = max(len(domain_parts) - 2, 0)
+    # --------------------------------------------------
+    # SUBDOMAINS
+    # --------------------------------------------------
 
-    # Obfuscation
-    suspicious_chars = ["@", "%", "//"]
+    domain_parts = domain_without_port.split(".")
+
+    if len(domain_parts) >= 3:
+        features["NoOfSubDomain"] = len(domain_parts) - 2
+    else:
+        features["NoOfSubDomain"] = 0
+
+    # --------------------------------------------------
+    # OBFUSCATION
+    # --------------------------------------------------
+
+    # IMPORTANT:
+    # We do NOT count "://" as obfuscation.
+    #
+    # @       -> suspicious
+    # %       -> URL encoding
+    # encoded characters -> suspicious
+    #
+    # A normal https:// URL should NOT automatically
+    # become obfuscated.
+
+    at_count = url.count("@")
+    percent_count = url.count("%")
+
     features["HasObfuscation"] = int(
-        any(char in url for char in suspicious_chars)
+        at_count > 0 or percent_count > 0
     )
 
     features["NoOfObfuscatedChar"] = (
-        url.count("@")
-        + url.count("%")
+        at_count + percent_count
     )
 
     features["ObfuscationRatio"] = (
@@ -44,25 +81,45 @@ def extract_url_features(url):
         if len(url) > 0 else 0
     )
 
-    # Character statistics
-    features["NoOfLettersInURL"] = sum(c.isalpha() for c in url)
+    # --------------------------------------------------
+    # CHARACTER STATISTICS
+    # --------------------------------------------------
+
+    features["NoOfLettersInURL"] = sum(
+        c.isalpha() for c in url
+    )
+
     features["LetterRatioInURL"] = (
         features["NoOfLettersInURL"] / len(url)
         if len(url) > 0 else 0
     )
 
-    features["NoOfDegitsInURL"] = sum(c.isdigit() for c in url)
+    features["NoOfDegitsInURL"] = sum(
+        c.isdigit() for c in url
+    )
+
     features["DegitRatioInURL"] = (
         features["NoOfDegitsInURL"] / len(url)
         if len(url) > 0 else 0
     )
 
-    # Special characters
+    # --------------------------------------------------
+    # QUERY PARAMETERS
+    # --------------------------------------------------
+
     features["NoOfEqualsInURL"] = url.count("=")
+
     features["NoOfQMarkInURL"] = url.count("?")
+
     features["NoOfAmpersandInURL"] = url.count("&")
 
-    special_chars = set("!#$%&'()*+,-./:;=?@[]^_`{|}~")
+    # --------------------------------------------------
+    # SPECIAL CHARACTERS
+    # --------------------------------------------------
+
+    special_chars = set(
+        "!#$%&'()*+,-./:;=?@[]^_`{|}~"
+    )
 
     features["NoOfOtherSpecialCharsInURL"] = sum(
         c in special_chars
@@ -74,19 +131,37 @@ def extract_url_features(url):
         if len(url) > 0 else 0
     )
 
+    # --------------------------------------------------
     # HTTPS
-    features["IsHTTPS"] = int(parsed.scheme == "https")
+    # --------------------------------------------------
+
+    features["IsHTTPS"] = int(
+        parsed.scheme.lower() == "https"
+    )
 
     return features
 
 
+# ------------------------------------------------------
+# TEST
+# ------------------------------------------------------
+
 if __name__ == "__main__":
-    test_url = "https://www.google.com"
 
-    result = extract_url_features(test_url)
+    test_urls = [
+        "https://www.google.com",
+        "https://www.microsoft.com",
+        "http://secure-login-example.com/verify/account",
+        "http://192.168.1.1/login",
+        "https://example.com/login?user=test"
+    ]
 
-    print("URL:", test_url)
-    print("\nExtracted features:")
+    for test_url in test_urls:
 
-    for key, value in result.items():
-        print(f"{key}: {value}")
+        print("\n" + "=" * 60)
+        print("URL:", test_url)
+
+        result = extract_url_features(test_url)
+
+        for key, value in result.items():
+            print(f"{key}: {value}")

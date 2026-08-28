@@ -1,6 +1,12 @@
 import pandas as pd
+import os
 
-file_path = "../data/PhiUSIIL_Phishing_URL_Dataset.csv"
+file_path = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "data",
+    "PhiUSIIL_Phishing_URL_Dataset.csv"
+)
 
 df = pd.read_csv(file_path, nrows=10)
 
