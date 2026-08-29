@@ -13,3 +13,4 @@ data/
 
 # Local trained model
 phishing_model.pkl
+scan_history.db
