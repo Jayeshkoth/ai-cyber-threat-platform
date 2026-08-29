@@ -8,9 +8,11 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "models"))
 
 from predict import predict_url
+from database.operations import save_scan
 
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -32,6 +34,12 @@ def home():
 @app.post("/predict")
 def predict(request: URLRequest):
     result, confidence = predict_url(request.url)
+
+    save_scan(
+        url=request.url,
+        prediction=result,
+        confidence=confidence,
+    )
 
     return {
         "url": request.url,
