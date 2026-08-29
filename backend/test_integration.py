@@ -32,3 +32,5 @@ def test_scan_is_saved_to_database():
 
     assert saved_scan is not None
     assert saved_scan.prediction == data["prediction"]
+
+    
