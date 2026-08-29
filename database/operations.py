@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import create_engine, func, select
@@ -33,7 +33,7 @@ def save_scan(
         url=url,
         prediction=prediction,
         confidence=confidence,
-        timestamp=timestamp or datetime.now(),
+        timestamp=timestamp or datetime.now(timezone.utc),
         security_analysis=security_analysis,
         threat_intelligence=threat_intelligence,
     )
