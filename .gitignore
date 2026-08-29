@@ -7,10 +7,3 @@ venv/
 node_modules/
 .vscode/
 *.log
-
-# Dataset
-data/
-
-# Local trained model
-phishing_model.pkl
-scan_history.db
