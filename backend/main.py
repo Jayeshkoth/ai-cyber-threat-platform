@@ -38,3 +38,40 @@ def predict(request: URLRequest):
         "prediction": result,
         "confidence": round(confidence * 100, 2)
     }
+
+class AnalyzeRequest(BaseModel):
+    input: str
+    type: str
+
+
+@app.post("/api/analyze")
+def analyze(request: AnalyzeRequest):
+
+    if request.type == "url":
+
+        result, confidence = predict_url(request.input)
+
+        if result == "PHISHING":
+            threat = "malicious"
+            risk_score = round(confidence * 100, 2)
+            category = "Phishing URL"
+        else:
+            threat = "safe"
+            risk_score = round((1 - confidence) * 100, 2)
+            category = "Legitimate URL"
+
+        return {
+            "threat": threat,
+            "risk_score": risk_score,
+            "confidence": round(confidence * 100, 2),
+            "category": category,
+            "message": f"The URL was classified as {result}."
+        }
+
+    return {
+        "threat": "unknown",
+        "risk_score": 0,
+        "confidence": 0,
+        "category": "unsupported",
+        "message": "This input type is not supported yet."
+    }
