@@ -98,6 +98,10 @@ function App() {
             <strong>Category:</strong> {result.category}
           </p>
 
+          {/* --------------------------------------------- */}
+          {/* SECURITY FINDINGS */}
+          {/* --------------------------------------------- */}
+
           {result.findings && result.findings.length > 0 && (
             <div>
               <h3>Security Findings</h3>
@@ -115,6 +119,70 @@ function App() {
               <strong>Security Findings:</strong> No suspicious
               indicators detected.
             </p>
+          )}
+
+          {/* --------------------------------------------- */}
+          {/* THREAT INTELLIGENCE */}
+          {/* --------------------------------------------- */}
+
+          {result.threat_intelligence && (
+            <div className="threat-intelligence">
+              <h3>Threat Intelligence</h3>
+
+              <p>
+                <strong>Reputation:</strong>{" "}
+                {result.threat_intelligence.reputation}
+              </p>
+
+              <p>
+                <strong>Blacklisted:</strong>{" "}
+                {result.threat_intelligence.blacklisted
+                  ? "Yes"
+                  : "No"}
+              </p>
+
+              <p>
+                <strong>Sources Checked:</strong>{" "}
+                {result.threat_intelligence.sources_checked &&
+                result.threat_intelligence.sources_checked.length > 0
+                  ? result.threat_intelligence.sources_checked.join(
+                      ", "
+                    )
+                  : "None"}
+              </p>
+
+              {result.threat_intelligence.details &&
+                result.threat_intelligence.details.length > 0 && (
+                  <div>
+                    <h4>Provider Results</h4>
+
+                    <ul>
+                      {result.threat_intelligence.details.map(
+                        (detail, index) => (
+                          <li key={index}>
+                            <strong>
+                              {detail.source || "Provider"}:
+                            </strong>{" "}
+                            {detail.status || "unknown"}
+
+                            {detail.malicious === true && (
+                              <span> — Malicious</span>
+                            )}
+
+                            {detail.malicious === false && (
+                              <span> — No malicious detection</span>
+                            )}
+
+                            {detail.malicious === null && (
+                              <span> — No determination</span>
+                            )}
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                )}
+            </div>
           )}
         </div>
       )}
