@@ -13,7 +13,13 @@ sys.path.append(
 
 from predict import predict_url
 from security_analysis import analyze_url
-from database.operations import save_scan
+from database.operations import (
+    save_scan,
+    get_recent_scans,
+    get_scan,
+    get_statistics,
+)
+from database.utils import scan_to_dict
 from threat_intelligence.checker import check_threat_intelligence
 
 
@@ -45,6 +51,25 @@ def home():
     return {
         "message": "AI Cyber Threat Platform API is running"
     }
+@app.get("/api/history")
+def history(limit: int = 10):
+    scans = get_recent_scans(limit)
+    return {
+        "scans": [scan_to_dict(scan) for scan in scans]
+    }
+@app.get("/api/statistics")
+def statistics():
+    return get_statistics()
+@app.get("/api/history/{scan_id}")
+def scan_details(scan_id: int):
+    scan = get_scan(scan_id)
+
+    if scan is None:
+        return {
+            "error": "Scan not found"
+        }
+
+    return scan_to_dict(scan)
 
 
 @app.post("/predict")
