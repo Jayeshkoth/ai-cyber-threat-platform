@@ -46,18 +46,21 @@ def predict(request: URLRequest):
 
     result = predict_url(request.url)
 
+    confidence = max(
+        result["phishing_probability"],
+        result["legitimate_probability"]
+    )
+
     save_scan(
         url=request.url,
         prediction=result["prediction"],
-        confidence=max(
-            result["phishing_probability"],
-            result["legitimate_probability"]
-        ),
+        confidence=confidence,
     )
 
     return {
         "url": result["url"],
         "prediction": result["prediction"],
+        "confidence": confidence,
         "phishing_probability": result["phishing_probability"],
         "legitimate_probability": result["legitimate_probability"]
     }
