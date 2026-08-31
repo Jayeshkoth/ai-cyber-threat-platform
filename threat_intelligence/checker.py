@@ -8,13 +8,22 @@ def check_threat_intelligence(url: str) -> ThreatIntelResult:
     result = ThreatIntelResult(url=url)
 
     providers = [
-        virustotal.check_url,
-        phishtank.check_url,
+        ("VirusTotal", virustotal.check_url),
+        ("PhishTank", phishtank.check_url),
     ]
 
-    for provider in providers:
+    for provider_name, provider_func in providers:
 
-        provider_result = provider(url)
+        try:
+            provider_result = provider_func(url)
+
+        except Exception as error:
+            provider_result = {
+                "source": provider_name,
+                "status": "error",
+                "malicious": None,
+                "details": str(error)
+            }
 
         result.sources_checked.append(
             provider_result["source"]
