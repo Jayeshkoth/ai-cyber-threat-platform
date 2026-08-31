@@ -7,6 +7,43 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const scanURL = async () => {
+    setError("");
+    setResult(null);
+
+    if (!url.trim()) {
+      setError("Please enter a URL.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input: url,
+          type: "url",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Scan failed");
+      }
+
+      const data = await response.json();
+
+      setResult(data);
+    } catch (err) {
+      setError("Unable to scan the URL. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div>
       <h1>AI Cyber Threat Platform</h1>
@@ -20,54 +57,65 @@ function App() {
         placeholder="Enter URL"
         value={url}
         onChange={(event) => {
-  setUrl(event.target.value);
-  setError("");
-}}
+          setUrl(event.target.value);
+          setError("");
+        }}
       />
 
-     <button
-  onClick={async () => {
-  setError("");
-  setResult(null);
+      <button onClick={scanURL}>
+        {loading ? "Scanning..." : "Scan URL"}
+      </button>
 
-  if (!url.trim()) {
-    setError("Please enter a URL.");
-    return;
-  }
+      {error && <p className="error-message">{error}</p>}
 
-  setLoading(true);
+      {result && (
+        <div
+          className={`result-card ${
+            result.threat === "malicious"
+              ? "phishing"
+              : "legitimate"
+          }`}
+        >
+          <h2>
+            {result.threat === "malicious"
+              ? "⚠️ MALICIOUS"
+              : "✅ SAFE"}
+          </h2>
 
-    try {
-      const response = await fetch("http://127.0.0.1:8000/predict", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url }),
-      });
+          <p>
+            <strong>URL:</strong> {result.url}
+          </p>
 
-      const data = await response.json();
+          <p>
+            <strong>Risk Score:</strong> {result.risk_score}/100
+          </p>
 
-      setResult(data);
-    } catch (err) {
-      setError("Unable to scan the URL. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }}
->
-  {loading ? "Scanning..." : "Scan URL"}
-</button>
-        {error && <p className="error-message">{error}</p>}
-         {result && (
-       <div
-  className={`result-card ${
-    result.prediction === "PHISHING" ? "phishing" : "legitimate"
-  }`}
->
-          <h2>{result.prediction === "PHISHING" ? "⚠️ PHISHING" : "✅ LEGITIMATE"}</h2>
-          
-          <p>Confidence: {result.confidence}%</p>
+          <p>
+            <strong>Confidence:</strong> {result.confidence}%
+          </p>
+
+          <p>
+            <strong>Category:</strong> {result.category}
+          </p>
+
+          {result.findings && result.findings.length > 0 && (
+            <div>
+              <h3>Security Findings</h3>
+
+              <ul>
+                {result.findings.map((finding, index) => (
+                  <li key={index}>{finding}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {result.findings && result.findings.length === 0 && (
+            <p>
+              <strong>Security Findings:</strong> No suspicious
+              indicators detected.
+            </p>
+          )}
         </div>
       )}
     </div>
