@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from dataclasses import asdict
+import json
 import sys
 import os
 
@@ -12,13 +14,17 @@ sys.path.append(
 from predict import predict_url
 from security_analysis import analyze_url
 from database.operations import save_scan
+from threat_intelligence.checker import check_threat_intelligence
 
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,7 +90,18 @@ def analyze(request: AnalyzeRequest):
         security_result = analyze_url(request.input)
 
         # ---------------------------------------------
-        # 3. ML RESULT
+        # 3. THREAT INTELLIGENCE ANALYSIS
+        # ---------------------------------------------
+
+        threat_intel_result = check_threat_intelligence(
+            request.input
+        )
+
+        # Convert dataclass result into dictionary
+        threat_intel_dict = asdict(threat_intel_result)
+
+        # ---------------------------------------------
+        # 4. ML RESULT
         # ---------------------------------------------
 
         if ml_result["prediction"] == "PHISHING":
@@ -103,7 +120,26 @@ def analyze(request: AnalyzeRequest):
         )
 
         # ---------------------------------------------
-        # 4. RETURN COMBINED ANALYSIS
+        # 5. SAVE COMPLETE SCAN TO DATABASE
+        # ---------------------------------------------
+
+        save_scan(
+            url=request.input,
+            prediction=ml_result["prediction"],
+            confidence=max(
+                ml_result["phishing_probability"],
+                ml_result["legitimate_probability"]
+            ),
+            security_analysis=json.dumps(
+                security_result
+            ),
+            threat_intelligence=json.dumps(
+                threat_intel_dict
+            ),
+        )
+
+        # ---------------------------------------------
+        # 6. RETURN COMBINED ANALYSIS
         # ---------------------------------------------
 
         return {
@@ -123,6 +159,16 @@ def analyze(request: AnalyzeRequest):
             # Security analysis
             "risk_score": security_result["risk_score"],
             "findings": security_result["findings"],
+
+            # Threat intelligence
+            "threat_intelligence": {
+                "reputation": threat_intel_dict["reputation"],
+                "blacklisted": threat_intel_dict["blacklisted"],
+                "sources_checked": threat_intel_dict[
+                    "sources_checked"
+                ],
+                "details": threat_intel_dict["details"],
+            },
 
             # General category/message
             "category": category,
