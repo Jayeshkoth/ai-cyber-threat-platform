@@ -7,7 +7,7 @@ SUSPICIOUS_TLDS = {
     "tk", "ml", "ga", "cf", "gq", "xyz", "top", "click", "zip"
 }
 
-SUSPICIOUS_KEYWORDS = {
+SUSPICIOUS_KEYWORDS = (
     "login",
     "signin",
     "verify",
@@ -20,7 +20,7 @@ SUSPICIOUS_KEYWORDS = {
     "billing",
     "wallet",
     "confirm",
-}
+)
 
 
 def _is_ip_address(hostname):
@@ -38,6 +38,10 @@ def _is_ip_address(hostname):
 def analyze_url(url):
     """
     Analyze a URL using security heuristics.
+
+    The risk score is a heuristic indicator from 0 to 100.
+    Higher scores mean that more suspicious URL characteristics
+    were detected. The score is not a probability of maliciousness.
 
     Returns:
         {
