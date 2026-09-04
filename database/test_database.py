@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -13,6 +14,7 @@ from database.operations import (
     get_threat_trends,
     get_increased_risk_urls,
     get_threat_statistics,
+    get_attack_category_distribution,
 )
 
 
@@ -291,3 +293,151 @@ def test_get_threat_statistics_with_time_filter():
     assert statistics["total_scans"] == 2
     assert statistics["phishing_count"] == 1
     assert statistics["legitimate_count"] == 1
+
+
+def test_get_attack_category_distribution_multiple_categories():
+    start_time = datetime.now(timezone.utc) + timedelta(hours=1)
+    end_time = start_time + timedelta(seconds=10)
+
+    save_scan(
+        url="https://attack-category-1.example",
+        prediction="PHISHING",
+        confidence=0.90,
+        timestamp=start_time + timedelta(seconds=1),
+        security_analysis=json.dumps({
+            "attack_prediction": {
+                "attack_category": "Credential Theft Test"
+            }
+        }),
+    )
+
+    save_scan(
+        url="https://attack-category-2.example",
+        prediction="PHISHING",
+        confidence=0.85,
+        timestamp=start_time + timedelta(seconds=2),
+        security_analysis=json.dumps({
+            "attack_prediction": {
+                "attack_category": "Credential Theft Test"
+            }
+        }),
+    )
+
+    save_scan(
+        url="https://attack-category-3.example",
+        prediction="PHISHING",
+        confidence=0.80,
+        timestamp=start_time + timedelta(seconds=3),
+        security_analysis=json.dumps({
+            "attack_prediction": {
+                "attack_category": "Malware Test"
+            }
+        }),
+    )
+
+    distribution = get_attack_category_distribution(
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    assert distribution == {
+        "Credential Theft Test": 2,
+        "Malware Test": 1,
+    }
+
+
+def test_get_attack_category_distribution_without_attack_prediction():
+    start_time = datetime.now(timezone.utc) + timedelta(hours=3)
+    end_time = start_time + timedelta(seconds=10)
+
+    save_scan(
+        url="https://without-attack-prediction.example",
+        prediction="PHISHING",
+        confidence=0.90,
+        timestamp=start_time + timedelta(seconds=1),
+        security_analysis=json.dumps({
+            "security_score": 0.8
+        }),
+    )
+
+    save_scan(
+        url="https://with-attack-prediction.example",
+        prediction="PHISHING",
+        confidence=0.85,
+        timestamp=start_time + timedelta(seconds=2),
+        security_analysis=json.dumps({
+            "attack_prediction": {
+                "attack_category": "Phishing Test"
+            }
+        }),
+    )
+
+    distribution = get_attack_category_distribution(
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    assert distribution == {
+        "Phishing Test": 1,
+    }
+
+
+def test_get_attack_category_distribution_empty_history():
+    start_time = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    end_time = start_time + timedelta(days=1)
+
+    distribution = get_attack_category_distribution(
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    assert distribution == {}
+
+
+def test_get_attack_category_distribution_time_filter():
+    start_time = datetime.now(timezone.utc) + timedelta(hours=5)
+
+    save_scan(
+        url="https://inside-category-1.example",
+        prediction="PHISHING",
+        confidence=0.90,
+        timestamp=start_time + timedelta(seconds=1),
+        security_analysis=json.dumps({
+            "attack_prediction": {
+                "attack_category": "Inside Range Test"
+            }
+        }),
+    )
+
+    save_scan(
+        url="https://inside-category-2.example",
+        prediction="PHISHING",
+        confidence=0.85,
+        timestamp=start_time + timedelta(seconds=2),
+        security_analysis=json.dumps({
+            "attack_prediction": {
+                "attack_category": "Inside Range Test"
+            }
+        }),
+    )
+
+    save_scan(
+        url="https://outside-category.example",
+        prediction="PHISHING",
+        confidence=0.80,
+        timestamp=start_time + timedelta(seconds=20),
+        security_analysis=json.dumps({
+            "attack_prediction": {
+                "attack_category": "Outside Range Test"
+            }
+        }),
+    )
+
+    distribution = get_attack_category_distribution(
+        start_time=start_time,
+        end_time=start_time + timedelta(seconds=10),
+    )
+
+    assert distribution == {
+        "Inside Range Test": 2,
+    }

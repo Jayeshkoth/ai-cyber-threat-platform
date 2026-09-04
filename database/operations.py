@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -337,3 +338,48 @@ def get_threat_statistics(
             "phishing_count": phishing_count,
             "legitimate_count": legitimate_count,
         }
+
+
+def get_attack_category_distribution(
+    start_time=None,
+    end_time=None,
+):
+    with Session(engine) as session:
+        statement = select(ScanHistory)
+
+        if start_time is not None:
+            statement = statement.where(
+                ScanHistory.timestamp >= start_time
+            )
+
+        if end_time is not None:
+            statement = statement.where(
+                ScanHistory.timestamp <= end_time
+            )
+
+        scans = session.scalars(statement).all()
+
+    distribution = {}
+
+    for scan in scans:
+        if not scan.security_analysis:
+            continue
+
+        try:
+            analysis = json.loads(scan.security_analysis)
+        except (TypeError, json.JSONDecodeError):
+            continue
+
+        attack_prediction = analysis.get("attack_prediction")
+
+        if not isinstance(attack_prediction, dict):
+            continue
+
+        category = attack_prediction.get("attack_category")
+
+        if not category:
+            continue
+
+        distribution[category] = distribution.get(category, 0) + 1
+
+    return distribution
