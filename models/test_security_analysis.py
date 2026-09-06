@@ -160,3 +160,48 @@ def test_analysis_is_deterministic():
     second_result = analyze_url(url)
 
     assert first_result == second_result
+
+
+
+def test_multiple_suspicious_special_characters():
+    result = analyze_url(
+        "https://example.com/path$^{}"
+    )
+
+    assert result["risk_score"] >= 10
+    assert any(
+        "suspicious special characters" in finding
+        for finding in result["findings"]
+    )
+
+
+def test_ipv6_based_url():
+    result = analyze_url(
+        "http://[2001:db8::1]/login"
+    )
+
+    assert result["risk_score"] >= 30
+    assert any(
+        "IP address" in finding
+        for finding in result["findings"]
+    )
+
+
+def test_multiple_security_indicators():
+    result = analyze_url(
+        "https://example.xyz/%41/%42/login?redirect=https://example.com"
+    )
+
+    assert result["risk_score"] >= 45
+    assert any(
+        "suspicious TLD" in finding
+        for finding in result["findings"]
+    )
+    assert any(
+        "encoded characters" in finding
+        for finding in result["findings"]
+    )
+    assert any(
+        "security-sensitive keywords" in finding
+        for finding in result["findings"]
+    )
