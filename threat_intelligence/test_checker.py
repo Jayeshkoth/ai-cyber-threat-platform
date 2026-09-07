@@ -219,3 +219,54 @@ def test_provider_exception_does_not_crash_checker():
     assert result.url == "https://example.com"
     assert result.reputation == "clean"
     assert result.blacklisted is False
+
+
+def test_provider_exception_is_recorded_in_result():
+    fake_phishtank = {
+        "source": "PhishTank",
+        "status": "success",
+        "malicious": False,
+        "details": {
+            "in_database": False
+        }
+    }
+
+    with patch(
+        "threat_intelligence.checker.virustotal.check_url",
+        side_effect=Exception("VirusTotal connection failed")
+    ), patch(
+        "threat_intelligence.checker.phishtank.check_url",
+        return_value=fake_phishtank
+    ):
+
+        result = check_threat_intelligence("https://example.com")
+
+    assert "VirusTotal" in result.sources_checked
+
+    virus_total_result = next(
+        item
+        for item in result.details
+        if item["source"] == "VirusTotal"
+    )
+
+    assert virus_total_result["status"] == "error"
+    assert virus_total_result["malicious"] is None
+
+
+def test_all_provider_exceptions_return_unknown():
+    with patch(
+        "threat_intelligence.checker.virustotal.check_url",
+        side_effect=Exception("VirusTotal unavailable")
+    ), patch(
+        "threat_intelligence.checker.phishtank.check_url",
+        side_effect=Exception("PhishTank unavailable")
+    ):
+
+        result = check_threat_intelligence("https://example.com")
+
+    assert result.url == "https://example.com"
+    assert result.reputation == "unknown"
+    assert result.blacklisted is False
+
+    assert "VirusTotal" in result.sources_checked
+    assert "PhishTank" in result.sources_checked
