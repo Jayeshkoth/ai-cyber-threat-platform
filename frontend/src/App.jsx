@@ -14,6 +14,7 @@ function App() {
   const [repeatedUrls, setRepeatedUrls] = useState([]);
   const [increasedRiskUrls, setIncreasedRiskUrls] = useState([]);
   const [selectedScan, setSelectedScan] = useState(null);
+  const [trendRange, setTrendRange] = useState("all");
 
   const formatConfidence = (value) => {
     const number = Number(value);
@@ -74,9 +75,25 @@ const threatHistoryData = await threatHistoryResponse.json();
 
 
 setThreatHistory(threatHistoryData.history || []);
-const threatTrendsResponse = await fetch(
-  "http://127.0.0.1:8000/api/threat-trends"
-);
+const trendParams = new URLSearchParams();
+
+if (trendRange !== "all") {
+  const days = Number(trendRange);
+  const endTime = new Date();
+  const startTime = new Date();
+
+  startTime.setDate(startTime.getDate() - days);
+
+  trendParams.set("start_time", startTime.toISOString());
+  trendParams.set("end_time", endTime.toISOString());
+}
+
+const trendUrl =
+  trendRange === "all"
+    ? "http://127.0.0.1:8000/api/threat-trends"
+    : `http://127.0.0.1:8000/api/threat-trends?${trendParams.toString()}`;
+
+const threatTrendsResponse = await fetch(trendUrl);
 
 const threatTrendsData = await threatTrendsResponse.json();
 
@@ -98,8 +115,8 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
   }
 };
   useEffect(() => {
-    loadDashboard();
-  }, []);
+  loadDashboard();
+}, [trendRange]);
 
 
   const loadScanDetails = async (scanId) => {
@@ -408,8 +425,23 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
 </div>
 
 <section className="history-section">
-  <h2>Threat Trends</h2>
-  <div className="threat-trends">
+ <h2>Threat Trends</h2>
+
+<div className="threat-trends-controls">
+  <label htmlFor="trend-range">Time Range:</label>
+
+  <select
+  id="trend-range"
+  value={trendRange}
+  onChange={(event) => setTrendRange(event.target.value)}
+>
+    <option value="all">All Time</option>
+    <option value="7">Last 7 Days</option>
+    <option value="30">Last 30 Days</option>
+  </select>
+</div>
+
+<div className="threat-trends">
   <div className="trend-header">
     <strong>Date</strong>
     <strong>Phishing</strong>
