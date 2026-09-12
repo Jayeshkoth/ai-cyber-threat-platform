@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dataclasses import asdict
+from datetime import datetime
+from typing import Optional
 import json
 import sys
 import os
@@ -88,9 +90,16 @@ def threat_history():
         "history": get_threat_history()
     }
 @app.get("/api/threat-trends")
-def threat_trends():
+@app.get("/api/threat-trends")
+def threat_trends(
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+):
     return {
-        "trends": get_threat_trends()
+        "trends": get_threat_trends(
+            start_time=start_time,
+            end_time=end_time,
+        )
     }
 
 
