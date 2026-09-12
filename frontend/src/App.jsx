@@ -13,6 +13,7 @@ function App() {
   const [threatTrends, setThreatTrends] = useState([]);
   const [repeatedUrls, setRepeatedUrls] = useState([]);
   const [increasedRiskUrls, setIncreasedRiskUrls] = useState([]);
+  const [selectedScan, setSelectedScan] = useState(null);
 
   const formatConfidence = (value) => {
     const number = Number(value);
@@ -26,6 +27,18 @@ function App() {
     const percentage = number <= 1 ? number * 100 : number;
 
     return `${percentage.toFixed(2)}%`;
+  };
+    const parseStoredJson = (value) => {
+    if (!value) {
+      return null;
+    }
+
+    try {
+      return typeof value === "string" ? JSON.parse(value) : value;
+    } catch (error) {
+      console.error("Failed to parse stored scan data:", error);
+      return null;
+    }
   };
 
   const loadDashboard = async () => {
@@ -87,6 +100,24 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
   useEffect(() => {
     loadDashboard();
   }, []);
+
+
+  const loadScanDetails = async (scanId) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/history/${scanId}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to load scan details");
+      }
+
+      const data = await response.json();
+      setSelectedScan(data);
+    } catch (error) {
+      console.error("Error loading scan details:", error);
+    }
+  };
 
   const scanUrl = async () => {
     setError("");
@@ -447,7 +478,18 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
             <p className="empty-history">No scans yet.</p>
           ) : (
             history.map((scan) => (
-              <div className="history-card" key={scan.id}>
+              <div
+                className="history-card"
+                key={scan.id}
+                onClick={() => loadScanDetails(scan.id)}
+                 onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                loadScanDetails(scan.id);
+                   }
+                   }}
+                    role="button"
+                    tabIndex={0}
+                     >
                 <div className="history-main">
                   <div>
                     <strong>{scan.url}</strong>
@@ -483,6 +525,130 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
             ))
           )}
         </div>
+        {selectedScan && (
+  <div className="scan-details-card">
+    <div className="scan-details-header">
+      <h3>Scan Details</h3>
+
+      <button
+        type="button"
+        onClick={() => setSelectedScan(null)}
+      >
+        Close
+      </button>
+    </div>
+
+    <div className="scan-details-content">
+  {(() => {
+    const securityAnalysis = parseStoredJson(selectedScan.security_analysis);
+    const threatIntelligence = parseStoredJson(
+      selectedScan.threat_intelligence
+    );
+    const attackPrediction = securityAnalysis?.attack_prediction;
+
+    return (
+      <>
+        <div className="detail-item">
+          <strong>URL</strong>
+          <span>{selectedScan.url}</span>
+        </div>
+
+        <div className="detail-item">
+          <strong>Prediction</strong>
+          <span>{selectedScan.prediction}</span>
+        </div>
+
+        <div className="detail-item">
+          <strong>Confidence</strong>
+          <span>{formatConfidence(selectedScan.confidence)}</span>
+        </div>
+
+        {securityAnalysis && (
+          <>
+            <div className="detail-item">
+              <strong>Risk Score</strong>
+              <span>{securityAnalysis.risk_score ?? "N/A"}</span>
+            </div>
+
+            <div className="detail-section">
+              <h4>Security Findings</h4>
+
+              {securityAnalysis.findings?.length ? (
+                <ul>
+                  {securityAnalysis.findings.map((finding, index) => (
+                    <li key={index}>{finding}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No security findings.</p>
+              )}
+            </div>
+          </>
+        )}
+
+        {attackPrediction && (
+          <div className="detail-section">
+            <h4>Attack Prediction</h4>
+
+            <div className="detail-item">
+              <strong>Category</strong>
+              <span>{attackPrediction.attack_category}</span>
+            </div>
+
+            <div className="detail-item">
+              <strong>Likelihood</strong>
+              <span>{attackPrediction.attack_likelihood}%</span>
+            </div>
+
+            <div className="detail-item">
+              <strong>Severity</strong>
+              <span>{attackPrediction.severity}</span>
+            </div>
+
+            <h4>Evidence</h4>
+
+            {attackPrediction.evidence?.length ? (
+              <ul>
+                {attackPrediction.evidence.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>No evidence recorded.</p>
+            )}
+          </div>
+        )}
+
+        {threatIntelligence && (
+          <div className="detail-section">
+            <h4>Threat Intelligence</h4>
+
+            <div className="detail-item">
+              <strong>Reputation</strong>
+              <span>{threatIntelligence.reputation}</span>
+            </div>
+
+            <div className="detail-item">
+              <strong>Blacklisted</strong>
+              <span>
+                {threatIntelligence.blacklisted ? "Yes" : "No"}
+              </span>
+            </div>
+
+            <div className="detail-item">
+              <strong>Sources Checked</strong>
+              <span>
+                {threatIntelligence.sources_checked?.join(", ") || "None"}
+              </span>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  })()}
+</div>
+  </div>
+)}
       </section>
     </div>
   );
