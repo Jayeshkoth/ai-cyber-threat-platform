@@ -91,7 +91,6 @@ def threat_history():
         "history": get_threat_history()
     }
 @app.get("/api/threat-trends")
-@app.get("/api/threat-trends")
 def threat_trends(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
