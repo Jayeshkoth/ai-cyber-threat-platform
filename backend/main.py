@@ -30,6 +30,7 @@ from database.operations import (
 )
 from database.utils import scan_to_dict
 from threat_intelligence.checker import check_threat_intelligence
+from backend.alerts import generate_alert
 
 
 app = FastAPI()
@@ -116,6 +117,37 @@ def increased_risk_urls():
     return {
         "increased_risk_urls": get_increased_risk_urls()
     }
+@app.get("/api/alerts")
+def alerts():
+    scans = get_recent_scans(limit=100)
+
+    results = []
+
+    for scan in scans:
+        security_analysis = scan.security_analysis
+
+        if not security_analysis:
+            continue
+
+        try:
+            data = json.loads(security_analysis)
+        except (TypeError, json.JSONDecodeError):
+            continue
+
+        alert = data.get("alert")
+
+        if alert and alert.get("alert"):
+            results.append({
+                "scan_id": scan.id,
+                "url": scan.url,
+                "timestamp": scan.timestamp,
+                "severity": alert.get("severity"),
+                "risk_score": alert.get("risk_score"),
+                "prediction": alert.get("prediction"),
+                "message": alert.get("message"),
+            })
+
+    return {"alerts": results}
 
 
 @app.get("/api/statistics")
@@ -197,6 +229,14 @@ def analyze(request: AnalyzeRequest):
             security_result,
             threat_intel_dict
         )
+        # ---------------------------------------------
+        # 4.1 ALERT GENERATION
+        # ---------------------------------------------
+
+        alert_result = generate_alert({
+            "risk_score": security_result["risk_score"],
+            "prediction": ml_result["prediction"]
+        })
 
         # ---------------------------------------------
         # 5. GENERAL THREAT STATUS
@@ -226,7 +266,8 @@ def analyze(request: AnalyzeRequest):
         # existing security analysis JSON.
         security_analysis_to_save = {
             **security_result,
-            "attack_prediction": attack_prediction_result
+            "attack_prediction": attack_prediction_result,
+            "alert": alert_result
         }
 
         save_scan(
@@ -291,6 +332,8 @@ def analyze(request: AnalyzeRequest):
                     "evidence"
                 ],
             },
+            # Alert status
+            "alert": alert_result,
 
             # General category/message
             "category": category,

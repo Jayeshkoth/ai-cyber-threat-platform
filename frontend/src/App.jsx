@@ -1,4 +1,14 @@
 ﻿import { useEffect, useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import "./App.css";
 
 function App() {
@@ -13,6 +23,7 @@ function App() {
   const [threatTrends, setThreatTrends] = useState([]);
   const [repeatedUrls, setRepeatedUrls] = useState([]);
   const [increasedRiskUrls, setIncreasedRiskUrls] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [selectedScan, setSelectedScan] = useState(null);
   const [trendRange, setTrendRange] = useState("all");
 
@@ -107,6 +118,11 @@ setRepeatedUrls(repeatedUrlsData.repeated_urls || []);
 const increasedRiskResponse = await fetch(
   "http://127.0.0.1:8000/api/increased-risk-urls"
 );
+const alertsResponse = await fetch(
+  "http://127.0.0.1:8000/api/alerts"
+);
+const alertsData = await alertsResponse.json();
+setAlerts(alertsData.alerts || []);
 
 const increasedRiskData = await increasedRiskResponse.json();
 setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
@@ -355,6 +371,31 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
                 )}
             </div>
           )}
+          {result.alert && (
+  <div className={`provider-results alert-${result.alert.severity.toLowerCase()}`}>
+    <h3>Security Alert</h3>
+
+    <p>
+      <strong>Alert:</strong>{" "}
+      {result.alert.alert ? "Triggered" : "No Alert"}
+    </p>
+
+    <p>
+      <strong>Severity:</strong>{" "}
+      {result.alert.severity}
+    </p>
+
+    <p>
+      <strong>Risk Score:</strong>{" "}
+      {result.alert.risk_score}
+    </p>
+
+    <p>
+      <strong>Message:</strong>{" "}
+      {result.alert.message}
+    </p>
+  </div>
+)}
         </section>
       )}
 
@@ -440,6 +481,33 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
     <option value="30">Last 30 Days</option>
   </select>
 </div>
+<div className="threat-trend-chart">
+  <ResponsiveContainer width="100%" height={300}>
+    <LineChart data={threatTrends}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis dataKey="date" />
+      <YAxis allowDecimals={false} />
+      <Tooltip />
+      <Legend />
+      <Line
+  type="monotone"
+  dataKey="LEGITIMATE"
+  name="Legitimate"
+  stroke="#388e3c"
+  strokeWidth={4}
+  dot={{ r: 5 }}
+/>
+      <Line
+        type="monotone"
+        dataKey="PHISHING"
+        name="Phishing"
+        stroke="#d32f2f"
+         strokeWidth={4}
+          dot={{ r: 5 }}
+       />
+    </LineChart>
+  </ResponsiveContainer>
+</div>
 
 <div className="threat-trends">
   <div className="trend-header">
@@ -455,6 +523,44 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
       <span>{item.LEGITIMATE}</span>
     </div>
   ))}
+</div>
+<h2>Alerts</h2>
+
+<div className="alerts-section">
+  {alerts.length > 0 ? (
+    alerts.map((alert, index) => (
+      <div
+        className={`alert-card alert-${alert.severity.toLowerCase()}`}
+        key={index}
+      >
+        <h3>{alert.url}</h3>
+
+        <p>
+          <strong>Severity:</strong> {alert.severity}
+        </p>
+
+        <p>
+          <strong>Risk Score:</strong> {alert.risk_score}
+        </p>
+
+        <p>
+          <strong>Prediction:</strong> {alert.prediction}
+        </p>
+
+        <p>
+          <strong>Message:</strong> {alert.message}
+        </p>
+
+        <small>
+          Scan ID: {alert.scan_id}
+          <br />
+          {new Date(alert.timestamp).toLocaleString()}
+        </small>
+      </div>
+    ))
+  ) : (
+    <p>No active alerts.</p>
+  )}
 </div>
 <h2>Increased-Risk URLs</h2>
 <div className="increased-risk-urls">
@@ -577,6 +683,7 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
       selectedScan.threat_intelligence
     );
     const attackPrediction = securityAnalysis?.attack_prediction;
+    const alert = securityAnalysis?.alert;
 
     return (
       <>
@@ -673,8 +780,33 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
                 {threatIntelligence.sources_checked?.join(", ") || "None"}
               </span>
             </div>
-          </div>
+           </div>
         )}
+        {alert && (
+  <div className={`detail-section alert-${alert.severity.toLowerCase()}`}>
+    <h4>Security Alert</h4>
+
+    <div className="detail-item">
+      <strong>Alert</strong>
+      <span>{alert.alert ? "Triggered" : "No Alert"}</span>
+    </div>
+
+    <div className="detail-item">
+      <strong>Severity</strong>
+      <span>{alert.severity}</span>
+    </div>
+
+    <div className="detail-item">
+      <strong>Risk Score</strong>
+      <span>{alert.risk_score}</span>
+    </div>
+
+    <div className="detail-item">
+      <strong>Message</strong>
+      <span>{alert.message}</span>
+    </div>
+  </div>
+)}
       </>
     );
   })()}
