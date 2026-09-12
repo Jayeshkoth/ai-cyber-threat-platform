@@ -3,6 +3,26 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+@pytest.fixture(autouse=True)
+def clean_database(tmp_path, monkeypatch):
+    from sqlalchemy import create_engine
+    from database import operations
+    from database.models import Base
+
+    test_db_path = tmp_path / "test_scan_history.db"
+    test_engine = create_engine(
+        f"sqlite:///{test_db_path}",
+        connect_args={"check_same_thread": False},
+    )
+
+    Base.metadata.create_all(test_engine)
+
+    monkeypatch.setattr(operations, "engine", test_engine)
+
+    yield
+
+    test_engine.dispose()
+
 from database.operations import (
     save_scan,
     get_recent_scans,

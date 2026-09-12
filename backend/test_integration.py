@@ -23,7 +23,7 @@ def test_scan_is_saved_to_database():
     assert "prediction" in data
     assert "confidence" in data
 
-    scans = get_recent_scans()
+    scans = get_recent_scans(limit=100)
 
     saved_scan = next(
         (scan for scan in scans if scan.url == test_url),

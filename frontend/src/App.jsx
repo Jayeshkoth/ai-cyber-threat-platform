@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useEffect, useState } from "react";
 import "./App.css";
 
 function App() {
@@ -6,8 +6,89 @@ function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [statistics, setStatistics] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [attackCategories, setAttackCategories] = useState({});
+  const [threatHistory, setThreatHistory] = useState([]);
+  const [threatTrends, setThreatTrends] = useState([]);
+  const [repeatedUrls, setRepeatedUrls] = useState([]);
+  const [increasedRiskUrls, setIncreasedRiskUrls] = useState([]);
 
-  const scanURL = async () => {
+  const formatConfidence = (value) => {
+    const number = Number(value);
+
+    if (Number.isNaN(number)) {
+      return "N/A";
+    }
+
+    // Database stores confidence as decimal (0.9974)
+    // API scan result may already return percentage (99.74)
+    const percentage = number <= 1 ? number * 100 : number;
+
+    return `${percentage.toFixed(2)}%`;
+  };
+
+  const loadDashboard = async () => {
+    try {
+      const [statsResponse, historyResponse, attackCategoriesResponse] =
+  await Promise.all([
+    fetch("http://127.0.0.1:8000/api/statistics"),
+    fetch("http://127.0.0.1:8000/api/history"),
+    fetch("http://127.0.0.1:8000/api/attack-category-distribution"),
+  ]);
+
+     if (
+  !statsResponse.ok ||
+  !historyResponse.ok ||
+  !attackCategoriesResponse.ok
+) {
+  throw new Error("Failed to load dashboard data");
+}
+
+      const statsData = await statsResponse.json();
+      const historyData = await historyResponse.json();
+      const attackCategoriesData = await attackCategoriesResponse.json();
+
+        setStatistics(statsData);
+setHistory(historyData.scans || []);
+setAttackCategories(attackCategoriesData);
+
+const threatHistoryResponse = await fetch(
+  "http://127.0.0.1:8000/api/threat-history"
+);
+const threatHistoryData = await threatHistoryResponse.json();
+
+
+
+setThreatHistory(threatHistoryData.history || []);
+const threatTrendsResponse = await fetch(
+  "http://127.0.0.1:8000/api/threat-trends"
+);
+
+const threatTrendsData = await threatTrendsResponse.json();
+
+setThreatTrends(threatTrendsData.trends || []);
+const repeatedUrlsResponse = await fetch(
+  "http://127.0.0.1:8000/api/repeated-urls"
+);
+
+const repeatedUrlsData = await repeatedUrlsResponse.json();
+setRepeatedUrls(repeatedUrlsData.repeated_urls || []);
+const increasedRiskResponse = await fetch(
+  "http://127.0.0.1:8000/api/increased-risk-urls"
+);
+
+const increasedRiskData = await increasedRiskResponse.json();
+setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
+  } catch (err) {
+    console.error("Dashboard loading error:", err);
+  }
+};
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const scanUrl = async () => {
     setError("");
     setResult(null);
 
@@ -25,7 +106,7 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          input: url,
+          input: url.trim(),
           type: "url",
         }),
       });
@@ -37,145 +118,151 @@ function App() {
       const data = await response.json();
 
       setResult(data);
+
+      // Refresh statistics and recent scans
+      await loadDashboard();
     } catch (err) {
+      console.error(err);
       setError("Unable to scan the URL. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const maxAttackCategoryCount = Math.max(
+  ...Object.values(attackCategories),
+  1
+);
+
   return (
-    <div>
-      <h1>AI Cyber Threat Platform</h1>
+    <div className="app-container">
+      <header className="hero-section">
+        <h1>AI Cyber Threat Platform</h1>
+        <p>
+          Analyze URLs using AI prediction, security analysis, and threat
+          intelligence.
+        </p>
+      </header>
 
-      <p>
-        Enter a URL to check whether it is safe or suspicious.
-      </p>
+      <section className="scan-section">
+        <div className="scan-input-container">
+          <input
+            type="text"
+            placeholder="Enter URL"
+            value={url}
+            onChange={(event) => {
+              setUrl(event.target.value);
+              setError("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !loading) {
+                scanUrl();
+              }
+            }}
+          />
 
-      <input
-        type="text"
-        placeholder="Enter URL"
-        value={url}
-        onChange={(event) => {
-          setUrl(event.target.value);
-          setError("");
-        }}
-      />
+          <button onClick={scanUrl} disabled={loading}>
+            {loading ? "Scanning..." : "Scan URL"}
+          </button>
+        </div>
 
-      <button onClick={scanURL}>
-        {loading ? "Scanning..." : "Scan URL"}
-      </button>
-
-      {error && <p className="error-message">{error}</p>}
+        {error && <p className="error-message">{error}</p>}
+      </section>
 
       {result && (
-        <div
+        <section
           className={`result-card ${
-            result.threat === "malicious"
-              ? "phishing"
-              : "legitimate"
+            result.prediction === "PHISHING" ? "phishing" : "legitimate"
           }`}
         >
-          <h2>
-            {result.threat === "malicious"
-              ? "⚠️ MALICIOUS"
-              : "✅ SAFE"}
-          </h2>
+          <div className="result-header">
+            <span className="result-icon">
+             {result.prediction === "PHISHING" ? "⚠️" : "✅"}
+            </span>
 
-          <p>
-            <strong>URL:</strong> {result.url}
-          </p>
+            <h2>
+              {result.prediction === "PHISHING" ? "PHISHING" : "SAFE URL"}
+            </h2>
+          </div>
 
-          <p>
-            <strong>Risk Score:</strong> {result.risk_score}/100
-          </p>
+          <div className="result-details">
+            <p>
+              <strong>URL:</strong> {result.url}
+            </p>
 
-          <p>
-            <strong>Confidence:</strong> {result.confidence}%
-          </p>
+            <p>
+              <strong>Risk Score:</strong> {result.risk_score}/100
+            </p>
 
-          <p>
-            <strong>Category:</strong> {result.category}
-          </p>
+            <p>
+              <strong>Confidence:</strong>{" "}
+              {formatConfidence(result.confidence)}
+            </p>
 
-          {/* --------------------------------------------- */}
-          {/* SECURITY FINDINGS */}
-          {/* --------------------------------------------- */}
+            <p>
+              <strong>Category:</strong> {result.category}
+            </p>
+          </div>
 
-          {result.findings && result.findings.length > 0 && (
-            <div>
-              <h3>Security Findings</h3>
+          <div className="analysis-section">
+            <h3>Security Findings</h3>
 
+            {result.findings &&
+            Object.keys(result.findings).length > 0 ? (
               <ul>
-                {result.findings.map((finding, index) => (
-                  <li key={index}>{finding}</li>
+                {Object.entries(result.findings).map(([key, value]) => (
+                  <li key={key}>
+                    <strong>{key}:</strong> {String(value)}
+                  </li>
                 ))}
               </ul>
-            </div>
-          )}
-
-          {result.findings && result.findings.length === 0 && (
-            <p>
-              <strong>Security Findings:</strong> No suspicious
-              indicators detected.
-            </p>
-          )}
-
-          {/* --------------------------------------------- */}
-          {/* THREAT INTELLIGENCE */}
-          {/* --------------------------------------------- */}
+            ) : (
+              <p>No suspicious indicators detected.</p>
+            )}
+          </div>
 
           {result.threat_intelligence && (
-            <div className="threat-intelligence">
+            <div className="analysis-section">
               <h3>Threat Intelligence</h3>
 
               <p>
                 <strong>Reputation:</strong>{" "}
-                {result.threat_intelligence.reputation}
+                {result.threat_intelligence.reputation || "Unknown"}
               </p>
 
               <p>
                 <strong>Blacklisted:</strong>{" "}
-                {result.threat_intelligence.blacklisted
-                  ? "Yes"
-                  : "No"}
+                {result.threat_intelligence.blacklisted ? "Yes" : "No"}
               </p>
 
               <p>
                 <strong>Sources Checked:</strong>{" "}
-                {result.threat_intelligence.sources_checked &&
-                result.threat_intelligence.sources_checked.length > 0
-                  ? result.threat_intelligence.sources_checked.join(
-                      ", "
-                    )
+                {Array.isArray(result.threat_intelligence.sources_checked)
+                  ? result.threat_intelligence.sources_checked.join(", ")
                   : "None"}
               </p>
 
-              {result.threat_intelligence.details &&
+              {Array.isArray(result.threat_intelligence.details) &&
                 result.threat_intelligence.details.length > 0 && (
-                  <div>
+                  <div className="provider-results">
                     <h4>Provider Results</h4>
 
                     <ul>
                       {result.threat_intelligence.details.map(
-                        (detail, index) => (
+                        (provider, index) => (
                           <li key={index}>
                             <strong>
-                              {detail.source || "Provider"}:
+                              {provider.source || "Provider"}:
                             </strong>{" "}
-                            {detail.status || "unknown"}
+                            {provider.status || "unknown"}
+                            {provider.malicious === true &&
+  "— Malicious"}
 
-                            {detail.malicious === true && (
-                              <span> — Malicious</span>
-                            )}
+{provider.malicious === false &&
+  "— No malicious detection"}
 
-                            {detail.malicious === false && (
-                              <span> — No malicious detection</span>
-                            )}
-
-                            {detail.malicious === null && (
-                              <span> — No determination</span>
-                            )}
+{provider.malicious === null &&
+  "— No determination"}
                           </li>
                         )
                       )}
@@ -184,10 +271,222 @@ function App() {
                 )}
             </div>
           )}
-        </div>
+
+          {result.attack_prediction && (
+            <div className="analysis-section">
+              <h3>AI Attack Prediction</h3>
+
+              <p>
+                <strong>Attack Category:</strong>{" "}
+                {result.attack_prediction.attack_category}
+              </p>
+
+              <p>
+                <strong>Attack Likelihood:</strong>{" "}
+                {result.attack_prediction.attack_likelihood}/100
+              </p>
+
+              <p>
+                <strong>Severity:</strong>{" "}
+                {result.attack_prediction.severity}
+              </p>
+
+              {Array.isArray(result.attack_prediction.evidence) &&
+                result.attack_prediction.evidence.length > 0 && (
+                  <div className="provider-results">
+                    <h4>Prediction Evidence</h4>
+
+                    <ul>
+                      {result.attack_prediction.evidence.map(
+                        (item, index) => (
+                          <li key={index}>{item}</li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                )}
+            </div>
+          )}
+        </section>
       )}
+
+      {statistics && (
+
+        <section className="dashboard-section">
+          <h2>Scan Statistics</h2>
+
+          <div className="statistics-grid">
+            <div className="stat-card">
+              <h3>Total Scans</h3>
+              <strong>{statistics.total_scans}</strong>
+            </div>
+
+            <div className="stat-card">
+              <h3>Phishing Detected</h3>
+              <strong>{statistics.phishing_count}</strong>
+
+              {statistics.total_scans > 0 && (
+                <span>
+                  {(
+                    (statistics.phishing_count / statistics.total_scans) *
+                    100
+                  ).toFixed(1)}
+                  % of scans
+                </span>
+              )}
+            </div>
+
+            <div className="stat-card">
+              <h3>Legitimate URLs</h3>
+              <strong>{statistics.legitimate_count}</strong>
+
+              {statistics.total_scans > 0 && (
+                <span>
+                  {(
+                    (statistics.legitimate_count / statistics.total_scans) *
+                    100
+                  ).toFixed(1)}
+                  % of scans
+                </span>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+      <div className="section">
+  <h2>Attack Category Distribution</h2>
+  
+
+  <div className="attack-category-grid">
+  {Object.entries(attackCategories).map(([category, count]) => (
+    <div className="stat-card" key={category}>
+      <h3>{category}</h3>
+      <p>{count}</p>
+
+      <div className="attack-bar">
+        <div
+          className="attack-bar-fill"
+          style={{
+            width: `${(count / maxAttackCategoryCount) * 100}%`,
+          }}
+        />
+      </div>
+    </div>
+  ))}
+</div>
+</div>
+
+<section className="history-section">
+  <h2>Threat Trends</h2>
+  <div className="threat-trends">
+  <div className="trend-header">
+    <strong>Date</strong>
+    <strong>Phishing</strong>
+    <strong>Legitimate</strong>
+  </div>
+
+  {threatTrends.map((item, index) => (
+    <div className="trend-row" key={index}>
+      <span>{item.date}</span>
+      <span>{item.PHISHING}</span>
+      <span>{item.LEGITIMATE}</span>
+    </div>
+  ))}
+</div>
+<h2>Increased-Risk URLs</h2>
+<div className="increased-risk-urls">
+  {increasedRiskUrls.map((item, index) => (
+    <div className="stat-card" key={index}>
+      <h3>{item.url}</h3>
+      <p>
+        Risk: {(item.first_risk * 100).toFixed(0)}% →{" "}
+        {(item.latest_risk * 100).toFixed(0)}%
+      </p>
+      <p>
+        Increase: +{(item.risk_increase * 100).toFixed(0)}%
+      </p>
+      <small>
+        First seen: {new Date(item.first_seen).toLocaleString()}
+        <br />
+        Last seen: {new Date(item.last_seen).toLocaleString()}
+      </small>
+    </div>
+  ))}
+</div>
+<h2>Repeated URLs</h2>
+<div className="repeated-urls">
+  {repeatedUrls.slice(0, 10).map((item, index) => (
+    <div className="stat-card" key={index}>
+      <h3>{item.url}</h3>
+      <p>Scans: {item.scan_count}</p>
+      <small>
+        First seen: {new Date(item.first_seen).toLocaleString()}
+        <br />
+        Last seen: {new Date(item.last_seen).toLocaleString()}
+      </small>
+    </div>
+  ))}
+</div>
+  <h2>Threat History</h2>
+  <p>Showing latest 10 of {threatHistory.length} records</p>
+
+<div className="threat-history">
+  {threatHistory.slice(-10).reverse().map((item, index) => (
+    <div className="stat-card" key={index}>
+      
+      <h3>{item.prediction}</h3>
+<p>{item.url}</p>
+<small>{new Date(item.timestamp).toLocaleString()}</small>
+    </div>
+  ))}
+</div>
+        <h2>Recent Scans</h2>
+
+        <div className="history-list">
+          {history.length === 0 ? (
+            <p className="empty-history">No scans yet.</p>
+          ) : (
+            history.map((scan) => (
+              <div className="history-card" key={scan.id}>
+                <div className="history-main">
+                  <div>
+                    <strong>{scan.url}</strong>
+
+                    <span className="scan-number">
+                      Scan #{scan.id}
+                    </span>
+                  </div>
+
+                  <span
+                    className={`history-status ${
+                      scan.prediction === "PHISHING"
+                        ? "phishing"
+                        : "legitimate"
+                    }`}
+                  >
+                    {scan.prediction}
+                  </span>
+                </div>
+
+                <div className="history-details">
+                  <span>
+                    Confidence: {formatConfidence(scan.confidence)}
+                  </span>
+
+                  <span>
+                    {scan.timestamp
+                      ? new Date(scan.timestamp).toLocaleString()
+                      : "Unknown time"}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   );
 }
 
 export default App;
+

@@ -13,11 +13,18 @@ sys.path.append(
 
 from predict import predict_url
 from security_analysis import analyze_url
+from attack_prediction import predict_attack
+
 from database.operations import (
     save_scan,
     get_recent_scans,
     get_scan,
     get_statistics,
+    get_threat_history,
+    get_repeated_urls,
+    get_threat_trends,
+    get_increased_risk_urls,
+    get_attack_category_distribution,
 )
 from database.utils import scan_to_dict
 from threat_intelligence.checker import check_threat_intelligence
@@ -25,11 +32,24 @@ from threat_intelligence.checker import check_threat_intelligence
 
 app = FastAPI()
 
+
+# --------------------------------------------------
+# CORS CONFIGURATION
+# --------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:5176",
+        "http://localhost:5177",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+        "http://127.0.0.1:5176",
+        "http://127.0.0.1:5177",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -51,15 +71,49 @@ def home():
     return {
         "message": "AI Cyber Threat Platform API is running"
     }
+
+
 @app.get("/api/history")
 def history(limit: int = 10):
     scans = get_recent_scans(limit)
+
     return {
         "scans": [scan_to_dict(scan) for scan in scans]
     }
+
+
+@app.get("/api/threat-history")
+def threat_history():
+    return {
+        "history": get_threat_history()
+    }
+@app.get("/api/threat-trends")
+def threat_trends():
+    return {
+        "trends": get_threat_trends()
+    }
+
+
+@app.get("/api/attack-category-distribution")
+def attack_category_distribution():
+    return get_attack_category_distribution()
+@app.get("/api/repeated-urls")
+def repeated_urls():
+    return {
+        "repeated_urls": get_repeated_urls()
+    }
+@app.get("/api/increased-risk-urls")
+def increased_risk_urls():
+    return {
+        "increased_risk_urls": get_increased_risk_urls()
+    }
+
+
 @app.get("/api/statistics")
 def statistics():
     return get_statistics()
+
+
 @app.get("/api/history/{scan_id}")
 def scan_details(scan_id: int):
     scan = get_scan(scan_id)
@@ -126,7 +180,17 @@ def analyze(request: AnalyzeRequest):
         threat_intel_dict = asdict(threat_intel_result)
 
         # ---------------------------------------------
-        # 4. ML RESULT
+        # 4. ATTACK PREDICTION / THREAT INFERENCE
+        # ---------------------------------------------
+
+        attack_prediction_result = predict_attack(
+            ml_result,
+            security_result,
+            threat_intel_dict
+        )
+
+        # ---------------------------------------------
+        # 5. GENERAL THREAT STATUS
         # ---------------------------------------------
 
         if ml_result["prediction"] == "PHISHING":
@@ -145,8 +209,16 @@ def analyze(request: AnalyzeRequest):
         )
 
         # ---------------------------------------------
-        # 5. SAVE COMPLETE SCAN TO DATABASE
+        # 6. SAVE COMPLETE SCAN TO DATABASE
         # ---------------------------------------------
+
+        # Keep existing database structure intact.
+        # Add attack prediction information to the
+        # existing security analysis JSON.
+        security_analysis_to_save = {
+            **security_result,
+            "attack_prediction": attack_prediction_result
+        }
 
         save_scan(
             url=request.input,
@@ -156,7 +228,7 @@ def analyze(request: AnalyzeRequest):
                 ml_result["legitimate_probability"]
             ),
             security_analysis=json.dumps(
-                security_result
+                security_analysis_to_save
             ),
             threat_intelligence=json.dumps(
                 threat_intel_dict
@@ -164,7 +236,7 @@ def analyze(request: AnalyzeRequest):
         )
 
         # ---------------------------------------------
-        # 6. RETURN COMBINED ANALYSIS
+        # 7. RETURN COMPLETE COMBINED ANALYSIS
         # ---------------------------------------------
 
         return {
@@ -193,6 +265,22 @@ def analyze(request: AnalyzeRequest):
                     "sources_checked"
                 ],
                 "details": threat_intel_dict["details"],
+            },
+
+            # NEW: Attack prediction
+            "attack_prediction": {
+                "attack_category": attack_prediction_result[
+                    "attack_category"
+                ],
+                "attack_likelihood": attack_prediction_result[
+                    "attack_likelihood"
+                ],
+                "severity": attack_prediction_result[
+                    "severity"
+                ],
+                "evidence": attack_prediction_result[
+                    "evidence"
+                ],
             },
 
             # General category/message
