@@ -241,11 +241,11 @@ setIncreasedRiskUrls(increasedRiskData.increased_risk_urls || []);
         >
           <div className="result-header">
             <span className="result-icon">
-             {result.prediction === "PHISHING" ? "⚠️" : "✅"}
+             {result.category === "Phishing URL" ? "⚠️" : "✅"}
             </span>
 
             <h2>
-              {result.prediction === "PHISHING" ? "PHISHING" : "SAFE URL"}
+              {result.category === "Phishing URL" ? "PHISHING" : "SAFE URL"}
             </h2>
           </div>
 

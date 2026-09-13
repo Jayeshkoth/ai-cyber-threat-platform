@@ -212,6 +212,16 @@ def predict_attack(
             "Suspicious infrastructure characteristics were detected."
         )
 
+        # --------------------------------------------------
+    # 7.5 BRAND IMPERSONATION
+    # --------------------------------------------------
+
+    if "impersonate" in combined_findings:
+        scores["Generic Phishing"] += 50
+
+        evidence.append(
+            "The hostname appears to impersonate a trusted brand."
+        )
     # --------------------------------------------------
     # 8. COMBINATION EVIDENCE
     # --------------------------------------------------
@@ -267,9 +277,9 @@ def predict_attack(
         scores["Suspicious Infrastructure"] += 20
 
         evidence.append(
-            "Phishing probability combined with IP-based infrastructure "
-            "strengthens the suspicious-infrastructure assessment."
-        )
+            "Phishing probability combined with suspicious infrastructure "
+            "indicators strengthens the suspicious-infrastructure assessment."
+          )
 
     # --------------------------------------------------
     # 9. RISK SCORE
@@ -324,11 +334,15 @@ def predict_attack(
     # --------------------------------------------------
 
     if (
-        phishing_probability < 0.50
-        and risk_score < 40
-        and reputation != "malicious"
-    ):
-        scores["Benign"] = 80
+    phishing_probability < 0.50
+    and risk_score < 40
+    and reputation != "malicious"
+    and not any(
+        "impersonate" in finding.lower()
+        for finding in findings
+    )
+):
+     scores["Benign"] = 80
 
     # --------------------------------------------------
     # 12. FINAL CATEGORY

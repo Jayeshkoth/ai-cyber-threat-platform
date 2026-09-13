@@ -16,6 +16,7 @@ sys.path.append(
 from predict import predict_url
 from security_analysis import analyze_url
 from attack_prediction import predict_attack
+from backend.trusted_domains import is_trusted_domain
 
 from database.operations import (
     save_scan,
@@ -202,6 +203,12 @@ def analyze(request: AnalyzeRequest):
 
         ml_result = predict_url(request.input)
 
+        if is_trusted_domain(request.input):
+            ml_result["prediction"] = "LEGITIMATE"
+            ml_result["phishing_probability"] = 0.0
+            ml_result["legitimate_probability"] = 1.0
+            ml_result["confidence"] = 100.0
+
         # ---------------------------------------------
         # 2. SECURITY HEURISTIC ANALYSIS
         # ---------------------------------------------
@@ -215,7 +222,6 @@ def analyze(request: AnalyzeRequest):
         threat_intel_result = check_threat_intelligence(
             request.input
         )
-
         # Convert dataclass result into dictionary
         threat_intel_dict = asdict(threat_intel_result)
 
@@ -233,20 +239,27 @@ def analyze(request: AnalyzeRequest):
         # ---------------------------------------------
 
         alert_result = generate_alert({
-            "risk_score": security_result["risk_score"],
-            "prediction": ml_result["prediction"]
-        })
+    "risk_score": security_result["risk_score"],
+    "prediction": ml_result["prediction"],
+    "findings": security_result["findings"]
+})
 
         # ---------------------------------------------
         # 5. GENERAL THREAT STATUS
         # ---------------------------------------------
 
-        if ml_result["prediction"] == "PHISHING":
-            threat = "malicious"
-            category = "Phishing URL"
+        if (
+             ml_result["prediction"] == "PHISHING"
+          or any(
+                 "impersonate" in finding.lower()
+            for finding in security_result["findings"]
+          )
+          ):
+           threat = "malicious"
+           category = "Phishing URL"
         else:
-            threat = "safe"
-            category = "Legitimate URL"
+             threat = "safe"
+             category = "Legitimate URL"
 
         confidence = round(
             max(
@@ -337,9 +350,10 @@ def analyze(request: AnalyzeRequest):
             # General category/message
             "category": category,
             "message": (
-                f"The URL was classified as "
-                f"{ml_result['prediction']}."
-            )
+                  "The URL was classified as PHISHING."
+                  if threat == "malicious"
+                  else "The URL was classified as LEGITIMATE."
+                 )
         }
 
     return {

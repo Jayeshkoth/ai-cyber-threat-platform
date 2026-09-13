@@ -139,7 +139,36 @@ def analyze_url(url):
         findings.append(
             "URL contains multiple suspicious special characters"
         )
+        # --------------------------------------------------
+    # 6. TRUSTED-BRAND IMPERSONATION
+    # --------------------------------------------------
 
+    trusted_domains = {
+        "google.com",
+        "github.com",
+        "microsoft.com",
+        "apple.com",
+        "amazon.com",
+        "wikipedia.org",
+        "youtube.com",
+        "linkedin.com",
+        "reddit.com",
+        "stackoverflow.com",
+    }
+
+    hostname_lower = hostname.lower().rstrip(".")
+
+    for trusted_domain in trusted_domains:
+        if (
+            trusted_domain in hostname_lower
+            and hostname_lower != trusted_domain
+            and not hostname_lower.endswith("." + trusted_domain)
+        ):
+            risk_score += 30
+            findings.append(
+                f"Hostname appears to impersonate {trusted_domain}"
+            )
+            break
     # --------------------------------------------------
     # 6. SUSPICIOUS TLD
     # --------------------------------------------------
